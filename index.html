@@ -1,24 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>mozofx | Powered by Deriv</title>
-  <style>
-    body { margin:0; font-family:system-ui,sans-serif; background:#000; color:#f5f5f5; }
-    header, main { max-width:520px; margin:0 auto; padding:16px; }
-    header { display:flex; justify-content:space-between; align-items:center; }
-    .muted { color:#a3a3a3; font-size:13px; }
-    .card { background:#111; border:1px solid #222; border-radius:12px; padding:16px; margin-top:12px; }
-    button, select, input { font:inherit; border-radius:8px; }
-    button { background:#fff; color:#000; border:0; padding:12px; font-weight:700; width:100%; margin-top:8px; }
-    button.alt { background:#222; color:#fff; }
-    select, input { width:100%; background:#000; color:#fff; border:1px solid #333; padding:10px; margin-top:6px; }
-    .row { display:flex; gap:8px; }
-    .row button { flex:1; }
-    #log { white-space:pre-wrap; font-size:13px; color:#d4d4d4; }
-    .risk { font-size:12px; color:#a3a3a3; margin-top:16px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mozofx | Powered by Deriv</title>
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#000;color:#f5f5f5}
+header,main{max-width:520px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between}
+.muted{color:#a3a3a3;font-size:13px}
+.card{background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-top:12px}
+button,select,input{font:inherit;border-radius:8px}
+button{background:#fff;color:#000;border:0;padding:12px;font-weight:700;width:100%;margin-top:8px}
+button.alt{background:#222;color:#fff}
+select,input{width:100%;background:#000;color:#fff;border:1px solid #333;padding:10px;margin-top:6px}
+.row{display:flex;gap:8px}.row button{flex:1}
+#log{white-space:pre-wrap;font-size:13px}
+.risk{font-size:12px;color:#a3a3a3;margin-top:16px}
+</style>
 </head>
 <body>
-  <header>
+<header><strong>mozofx</strong><span class="muted">Powered by Deriv</span></header>
+<main>
+<div class="card"><div id="status">Not logged in</div><div class="muted" id="price">Price: waiting</div><button id="login">Log in with Deriv</button></div>
+<div class="card">
+<label>Market</label>
+<select id="symbol"><option value="R_100">Volatility 100 Index</option><option value="R_50">Volatility 50 Index</option><option value="1HZ100V">Volatility 100 (1s)</option></select>
+<label>Stake USD</label><input id="stake" type="number" min="1" value="1">
+<label>Ticks</label><input id="duration" type="number" min="1" value="5">
+<div class="row"><button id="rise">Rise</button><button id="fall" class="alt">Fall</button></div>
+</div>
+<div class="card"><div id="log">No trade yet.</div></div>
+<p class="risk">mozofx is an independent site in partnership with Deriv, not an official Deriv website. Trading can lose money. Use a demo account first.</p>
+</main>
+<script>
+const APP_ID=1089;
+const AFFILIATE="9CUX5763KGDQ";
+const token=new URLSearchParams(location.search).get("token1");
+let ws,ok=false;
+function log(t){document.getElementById("log").textContent=t}
+function sub(){ws.send(JSON.stringify({ticks:document.getElementById("symbol").value,subscribe:1}))}
+function connect(){
+ws=new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id="+APP_ID);
+ws.onopen=()=>{if(token)ws.send(JSON.stringify({authorize:token}));sub()};
+ws.onmessage=(e)=>{
+const d=JSON.parse(e.data);
+if(d.error){log(d.error.message);return}
+if(d.msg_type==="authorize"){ok=true;const a=d.authorize;document.getElementById("status").textContent=a.loginid+" · "+a.currency+" "+Number(a.balance).toFixed(2)+(a.is_virtual?" · demo":" · real")}
+if(d.msg_type==="tick")document.getElementById("price").textContent="Price: "+d.tick.quote;
+if(d.msg_type==="buy")log("Bought "+d.buy.contract_id+"\nPayout "+d.buy.payout+"\nPrice "+d.buy.buy_price);
+};
+}
+function buy(type){
+if(!ok){log("Log in first.");return}
+ws.send(JSON.stringify({buy:1,price:Number(stake.value),parameters:{amount:Number(stake.value),basis:"stake",contract_type:type,currency:"USD",duration:Number(duration.value),duration_unit:"t",symbol:symbol.value}}));
+}
+login.onclick=()=>{location.href="https://oauth.deriv.com/oauth2/authorize?app_id="+APP_ID+"&l="+encodeURIComponent(location.origin+location.pathname)+"&affiliate_token="+AFFILIATE};
+symbol.onchange=()=>{if(ws&&ws.readyState===1)sub()};
+rise.onclick=()=>buy("CALL");
+fall.onclick=()=>buy("PUT");
+connect();
+</script>
+</body>
+</html>
